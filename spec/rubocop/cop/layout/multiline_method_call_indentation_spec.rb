@@ -73,6 +73,16 @@ RSpec.describe RuboCop::Cop::Layout::MultilineMethodCallIndentation, :config do
       RUBY
     end
 
+    it 'accepts arithmetic operation with block inside a grouped expression' do
+      expect_no_offenses(<<~RUBY)
+        (
+          a * b do
+          end
+        )
+          .c
+      RUBY
+    end
+
     it 'accepts an expression where the first method spans multiple lines' do
       expect_no_offenses(<<~RUBY)
         subject.each do |item|
@@ -86,6 +96,16 @@ RSpec.describe RuboCop::Cop::Layout::MultilineMethodCallIndentation, :config do
         payment = Models::IncomingPayments[
                 id:      input['incoming-payment-id'],
                    user_id: @user[:id]]
+      RUBY
+    end
+
+    it 'accepts aligned methods when multiline method chain with a block argument and method chain' do
+      expect_no_offenses(<<~RUBY)
+        a(b)
+          .c(
+            d do
+            end.f
+          )
       RUBY
     end
 
@@ -323,6 +343,16 @@ RSpec.describe RuboCop::Cop::Layout::MultilineMethodCallIndentation, :config do
         expect_correction(<<~RUBY)
           a
             &.b
+        RUBY
+      end
+
+      it 'accepts aligned methods when multiline method chain with a block argument and method chain' do
+        expect_no_offenses(<<~RUBY)
+          a&.(b)
+            .c(
+              d do
+              end.f
+            )
         RUBY
       end
     end

@@ -182,7 +182,7 @@ module RuboCop
           return unless rhs.source.start_with?('.', '&.')
 
           node = semantic_alignment_node(node)
-          return unless node&.loc&.selector
+          return unless node&.loc&.selector && node.loc.dot
 
           node.loc.dot.join(node.loc.selector)
         end
@@ -227,7 +227,11 @@ module RuboCop
           return unless (block_node = node.each_descendant(:block, :numblock).first)
           return unless block_node.multiline? && block_node.parent.call_type?
 
-          block_node.parent
+          if node.receiver.call_type?
+            node.receiver
+          else
+            block_node.parent
+          end
         end
 
         def first_call_has_a_dot(node)
