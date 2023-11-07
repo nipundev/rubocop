@@ -25,26 +25,29 @@ module RuboCop
         MSG = 'Remove the redundant double splat and braces, use keyword arguments directly.'
         MERGE_METHODS = %i[merge merge!].freeze
 
-        # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         def on_hash(node)
           return if node.pairs.empty? || node.pairs.any?(&:hash_rocket?)
           return unless (parent = node.parent)
-          return if parent.call_type? && !merge_method?(parent)
+          return unless parent.call_type? || parent.kwsplat_type?
+          return unless mergeable?(parent)
           return unless (kwsplat = node.each_ancestor(:kwsplat).first)
-          return if allowed_double_splat_receiver?(kwsplat)
+          return if !node.braces? || allowed_double_splat_receiver?(kwsplat)
 
           add_offense(kwsplat) do |corrector|
             autocorrect(corrector, node, kwsplat)
           end
         end
-        # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
         private
 
         def allowed_double_splat_receiver?(kwsplat)
-          return false unless kwsplat.children.first.call_type?
+          first_child = kwsplat.children.first
+          return true if first_child.block_type? || first_child.numblock_type?
+          return false unless first_child.call_type?
 
-          root_receiver = root_receiver(kwsplat.children.first)
+          root_receiver = root_receiver(first_child)
 
           !root_receiver&.hash_type?
         end
@@ -71,7 +74,7 @@ module RuboCop
 
         def select_merge_method_nodes(kwsplat)
           extract_send_methods(kwsplat).select do |node|
-            merge_method?(node)
+            mergeable?(node)
           end
         end
 
@@ -106,7 +109,7 @@ module RuboCop
         end
 
         def convert_to_new_arguments(node)
-          return unless merge_method?(node)
+          return unless mergeable?(node)
 
           node.arguments.map do |arg|
             if arg.hash_type?
@@ -117,8 +120,12 @@ module RuboCop
           end
         end
 
-        def merge_method?(node)
-          MERGE_METHODS.include?(node.method_name)
+        def mergeable?(node)
+          return true unless node.call_type?
+          return false unless MERGE_METHODS.include?(node.method_name)
+          return true unless (parent = node.parent)
+
+          mergeable?(parent)
         end
       end
     end
