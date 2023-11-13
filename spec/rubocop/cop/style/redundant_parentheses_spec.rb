@@ -150,6 +150,10 @@ RSpec.describe RuboCop::Cop::Style::RedundantParentheses, :config do
 
   it_behaves_like 'redundant', '(X)', 'X', 'a constant'
 
+  it_behaves_like 'redundant', '(-> { x })', '-> { x }', 'an expression'
+  it_behaves_like 'redundant', '(lambda { x })', 'lambda { x }', 'an expression'
+  it_behaves_like 'redundant', '(proc { x })', 'proc { x }', 'an expression'
+
   it_behaves_like 'redundant', '(x)', 'x', 'a method call'
   it_behaves_like 'redundant', '(x(1, 2))', 'x(1, 2)', 'a method call'
   it_behaves_like 'redundant', '("x".to_sym)', '"x".to_sym', 'a method call'
@@ -493,13 +497,85 @@ RSpec.describe RuboCop::Cop::Style::RedundantParentheses, :config do
     expect_no_offenses('(a...b)')
   end
 
-  it 'accepts parentheses around logical operator keywords' do
+  it 'registers parentheses around `||` logical operator keywords in method definition' do
+    expect_offense(<<~RUBY)
+      def foo
+        (x || y)
+        ^^^^^^^^ Don't use parentheses around a logical expression.
+      end
+    RUBY
+
+    expect_correction(<<~RUBY)
+      def foo
+        x || y
+      end
+    RUBY
+  end
+
+  it 'registers parentheses around `&&` logical operator keywords in method definition' do
+    expect_offense(<<~RUBY)
+      def foo
+        (x && y)
+        ^^^^^^^^ Don't use parentheses around a logical expression.
+      end
+    RUBY
+
+    expect_correction(<<~RUBY)
+      def foo
+        x && y
+      end
+    RUBY
+  end
+
+  it 'accepts parentheses around arithmetic operator' do
+    expect_no_offenses('x - (y || z)')
+  end
+
+  it 'accepts parentheses around logical operator keywords (`and`, `and`, `or`)' do
     expect_no_offenses('(1 and 2) and (3 or 4)')
+  end
+
+  it 'accepts parentheses around logical operator keywords (`or`, `or`, `and`)' do
+    expect_no_offenses('(1 or 2) or (3 and 4)')
   end
 
   it 'accepts parentheses around comparison operator keywords' do
     # Parentheses are redundant, but respect user's intentions for readability.
     expect_no_offenses('x && (y == z)')
+  end
+
+  it 'accepts parentheses around logical operator in splat' do
+    # Parentheses are redundant, but respect user's intentions for readability.
+    expect_no_offenses('x = *(y || z)')
+  end
+
+  it 'accepts parentheses around logical operator in double splat' do
+    # Parentheses are redundant, but respect user's intentions for readability.
+    expect_no_offenses('x(**(y || z))')
+  end
+
+  it 'accepts parentheses around logical operator in ternary operator' do
+    # Parentheses are redundant, but respect user's intentions for readability.
+    expect_no_offenses('cond ? x : (y || z)')
+  end
+
+  it 'registers parentheses around logical operator in `if`...`else`' do
+    expect_offense(<<~RUBY)
+      if cond
+        x
+      else
+        (y || z)
+        ^^^^^^^^ Don't use parentheses around a logical expression.
+      end
+    RUBY
+
+    expect_correction(<<~RUBY)
+      if cond
+        x
+      else
+        y || z
+      end
+    RUBY
   end
 
   it 'accepts parentheses around a method call with parenthesized logical expression receiver' do

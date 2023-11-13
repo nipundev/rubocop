@@ -17,6 +17,8 @@ module RuboCop
         include Parentheses
         extend AutoCorrector
 
+        ALLOWED_NODE_TYPES = %i[and or send splat kwsplat].freeze
+
         # @!method square_brackets?(node)
         def_node_matcher :square_brackets?, '(send {(send _recv _msg) str array hash} :[] ...)'
 
@@ -136,23 +138,29 @@ module RuboCop
           check_send(begin_node, node) if node.call_type?
         end
 
-        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         def find_offense_message(begin_node, node)
           return 'a keyword' if keyword_with_redundant_parentheses?(node)
           return 'a literal' if disallowed_literal?(begin_node, node)
           return 'a variable' if node.variable?
           return 'a constant' if node.const_type?
+          return 'an expression' if node.lambda_or_proc?
           return 'an interpolated expression' if interpolation?(begin_node)
 
-          return if begin_node.chained? || !begin_node.parent.nil?
+          return if begin_node.chained?
 
           if node.and_type? || node.or_type?
+            return if ALLOWED_NODE_TYPES.include?(begin_node.parent&.type)
+            return if begin_node.parent&.if_type? && begin_node.parent&.ternary?
+
             'a logical expression'
           elsif node.respond_to?(:comparison_method?) && node.comparison_method?
+            return unless begin_node.parent.nil?
+
             'a comparison expression'
           end
         end
-        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
         # @!method interpolation?(node)
         def_node_matcher :interpolation?, '[^begin ^^dstr]'
